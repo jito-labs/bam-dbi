@@ -139,12 +139,14 @@ mod tests {
 
     #[test]
     fn encodes_bamb_v0_frame() {
-        let frame = encode_bamb_frame(vec!["AQI=".to_owned(), "Aw==".to_owned()]).unwrap();
+        // Signed 1-lamport System Program transfer with a deterministic test keypair.
+        let transaction = "AcoNosI7GjzE2lO2f2fFUiJxja7zLkZzSxWmjDYG79pIViYtmXBRG9bw4LL3aXcOjjRSqycyW9YfZuV2xeULhgIBAAEDA6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbgHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkBAgIAAQwCAAAAAQAAAAAAAAA=";
+        let frame = encode_bamb_frame(vec![transaction.to_owned()]).unwrap();
         assert_eq!(&frame[..4], b"BAMB");
-        assert_eq!(&frame[4..8], &[0, 0, 2, 26]);
+        assert_eq!(&frame[4..8], &[0, 0, 1, 26]);
         assert_eq!(&frame[8..16], &[0; 8]);
-        assert_eq!(&frame[16..26], &[2, 0, 1, 0, 0, 0, 0, 0, 0, 0]);
-        assert_eq!(&frame[26..], &[1, 2, 3]);
+        assert_eq!(&frame[16..26], &[215, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(&frame[26..], STANDARD.decode(transaction).unwrap());
 
         assert!(encode_bamb_frame(Vec::new()).is_err());
         assert!(encode_bamb_frame(vec!["AQ==".to_owned(); 6]).is_err());
