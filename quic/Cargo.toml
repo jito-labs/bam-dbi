@@ -11,3 +11,10 @@ quinn = { version = "0.11", default-features = false, features = ["runtime-tokio
 solana-keypair = "3.1.2"
 solana-tls-utils = { version = "3.1.9", features = ["agave-unstable-api"] }
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "time"] }
+
+[dev-dependencies]
+solana-hash = "=4.5.0"
+solana-message = "=4.4.0"
+solana-system-interface = { version = "=3.2.0", features = ["bincode"] }
+solana-transaction = { version = "=4.1.5", features = ["wincode"] }
+wincode = "=0.5.5"

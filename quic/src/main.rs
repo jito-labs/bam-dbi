@@ -136,17 +136,56 @@ async fn send_frame(connection: &Connection, frame: &[u8]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use solana_hash::Hash;
+    use solana_keypair::Signer;
+    use solana_message::{v1, VersionedMessage};
+    use solana_system_interface::instruction::transfer;
+    use solana_transaction::{versioned::VersionedTransaction, Transaction};
 
     #[test]
-    fn encodes_bamb_v0_frame() {
-        // Signed 1-lamport System Program transfer with a deterministic test keypair.
-        let transaction = "AcoNosI7GjzE2lO2f2fFUiJxja7zLkZzSxWmjDYG79pIViYtmXBRG9bw4LL3aXcOjjRSqycyW9YfZuV2xeULhgIBAAEDA6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbgHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkBAgIAAQwCAAAAAQAAAAAAAAA=";
-        let frame = encode_bamb_frame(vec![transaction.to_owned()]).unwrap();
+    fn encodes_v1_and_legacy_transactions() {
+        let payer = Keypair::new();
+        let recent_blockhash = Hash::new_from_array([7; 32]);
+        let v1_message = v1::Message::try_compile(
+            &payer.pubkey(),
+            &[transfer(&payer.pubkey(), &payer.pubkey(), 1)],
+            recent_blockhash.clone(),
+        )
+        .unwrap();
+        let v1_transaction =
+            VersionedTransaction::try_new(VersionedMessage::V1(v1_message), &[&payer]).unwrap();
+        let legacy_transaction = Transaction::new_signed_with_payer(
+            &[transfer(&payer.pubkey(), &payer.pubkey(), 2)],
+            Some(&payer.pubkey()),
+            &[&payer],
+            recent_blockhash,
+        )
+        .into();
+        let transactions = [v1_transaction, legacy_transaction]
+            .iter()
+            .map(|transaction| wincode::serialize(transaction).unwrap())
+            .collect::<Vec<_>>();
+        let frame = encode_bamb_frame(
+            transactions
+                .iter()
+                .map(|transaction| STANDARD.encode(transaction))
+                .collect(),
+        )
+        .unwrap();
+
         assert_eq!(&frame[..4], b"BAMB");
-        assert_eq!(&frame[4..8], &[0, 0, 1, 26]);
+        assert_eq!(&frame[4..8], &[0, 0, 2, 26]);
         assert_eq!(&frame[8..16], &[0; 8]);
-        assert_eq!(&frame[16..26], &[215, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-        assert_eq!(&frame[26..], STANDARD.decode(transaction).unwrap());
+        assert_eq!(
+            &frame[16..20],
+            &[
+                u16::try_from(transactions[0].len()).unwrap().to_le_bytes(),
+                u16::try_from(transactions[1].len()).unwrap().to_le_bytes(),
+            ]
+            .concat()
+        );
+        assert_eq!(&frame[20..HEADER_SIZE], &[0; 6]);
+        assert_eq!(&frame[HEADER_SIZE..], transactions.concat());
 
         assert!(encode_bamb_frame(Vec::new()).is_err());
         assert!(encode_bamb_frame(vec!["AQ==".to_owned(); 6]).is_err());
