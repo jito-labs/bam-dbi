@@ -81,6 +81,8 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "quinn",
+ "reqwest",
+ "serde_json",
  "solana-hash",
  "solana-keypair",
  "solana-message",
