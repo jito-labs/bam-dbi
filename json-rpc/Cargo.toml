@@ -7,3 +7,12 @@ publish = false
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 serde_json = "1"
+
+[dev-dependencies]
+base64 = "0.22"
+solana-hash = "=4.5.0"
+solana-keypair = "3.1.2"
+solana-message = "=4.4.0"
+solana-system-interface = { version = "=3.2.0", features = ["bincode"] }
+solana-transaction = { version = "=4.1.5", features = ["wincode"] }
+wincode = "=0.5.5"

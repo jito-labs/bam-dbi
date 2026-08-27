@@ -51,16 +51,33 @@ fn send_bundle_request(transactions: Vec<String>) -> Result<Value, &'static str>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    use solana_hash::Hash;
+    use solana_keypair::{Keypair, Signer};
+    use solana_message::{v1, VersionedMessage};
+    use solana_system_interface::instruction::transfer;
+    use solana_transaction::versioned::VersionedTransaction;
 
     #[test]
-    fn builds_current_bam_request() {
+    fn builds_request_with_v1_transaction() {
+        let payer = Keypair::new();
+        let message = v1::Message::try_compile(
+            &payer.pubkey(),
+            &[transfer(&payer.pubkey(), &payer.pubkey(), 1)],
+            Hash::new_from_array([7; 32]),
+        )
+        .unwrap();
+        let transaction =
+            VersionedTransaction::try_new(VersionedMessage::V1(message), &[&payer]).unwrap();
+        let encoded_transaction = STANDARD.encode(wincode::serialize(&transaction).unwrap());
+
         assert_eq!(
-            send_bundle_request(vec!["AQ==".to_owned()]).unwrap(),
+            send_bundle_request(vec![encoded_transaction.clone()]).unwrap(),
             json!({
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "sendBundle",
-                "params": [["AQ=="], {"encoding": "base64"}],
+                "params": [[encoded_transaction], {"encoding": "base64"}],
             })
         );
         assert!(send_bundle_request(Vec::new()).is_err());
