@@ -1,0 +1,3 @@
+[workspace]
+members = ["json-rpc"]
+resolver = "2"
