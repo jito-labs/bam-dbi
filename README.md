@@ -19,5 +19,19 @@ cargo run --release -p bam-json-rpc -- "$SIGNED_TX_B64"
 A returned bundle ID means BAM accepted the bundle into its ingress queue. It
 does not guarantee the bundle will land.
 
-Add another transport, such as QUIC, as a sibling workspace crate. Share code
-only when two transports require the same behavior.
+## QUIC
+
+The `quic` crate sends the same input as one BAMB v0 frame. Its keypair is the
+allowlisted QUIC credential, not a transaction signer:
+
+```bash
+export BAM_QUIC_ADDR='<provided-host>:<port>'
+export BAM_QUIC_KEYPAIR='/path/to/allowlisted-keypair.json'
+
+cargo run --release -p bam-quic -- "$SIGNED_TX_B64"
+```
+
+A successful send means the peer acknowledged the stream bytes. QUIC returns
+no bundle ID or application response, so acceptance and landing are
+unconfirmed. Production senders should reuse the connection and open one
+unidirectional stream per bundle.
