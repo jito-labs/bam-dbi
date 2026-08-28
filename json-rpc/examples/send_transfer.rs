@@ -12,7 +12,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let payer_path = required("PAYER_KEYPAIR")?;
     let payer = read_keypair_file(&payer_path)
         .map_err(|error| io::Error::other(format!("read payer keypair {payer_path}: {error}")))?;
-    let recipient = required("RECIPIENT")?.parse()?;
+    let recipient = match env::var("RECIPIENT") {
+        Ok(value) if !value.is_empty() => value.parse()?,
+        _ => payer.pubkey(),
+    };
     let lamports = env::var("LAMPORTS")
         .unwrap_or_else(|_| "1".to_owned())
         .parse()?;
@@ -27,13 +30,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     let transaction = VersionedTransaction::try_new(VersionedMessage::V0(message), &[&payer])?;
     let wire_transaction = wincode::serialize(&transaction)?;
+    let signature = transaction.signatures[0].to_string();
+
+    println!("transaction_signature={signature}");
 
     let bundle_id = bam_json_rpc::send_bundle(
         &required("BAM_BUNDLE_URL")?,
         &required("JITO_AUTH_UUID")?,
         &[wire_transaction],
     )?;
-    println!("{bundle_id}");
+    println!("bundle_id={bundle_id}");
+    println!("bundle_id_hex={}", bam_json_rpc::bundle_id_hex(&bundle_id)?);
     Ok(())
 }
 
