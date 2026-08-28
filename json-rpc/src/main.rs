@@ -20,9 +20,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let credential =
         env::var("JITO_AUTH_UUID").map_err(|_| io::Error::other("JITO_AUTH_UUID is required"))?;
 
-    println!(
-        "{}",
-        bam_json_rpc::send_bundle(&url, &credential, &transactions)?
-    );
+    let bundle_id = bam_json_rpc::send_bundle(&url, &credential, &transactions)?;
+    println!("bundle_id={bundle_id}");
+    println!("bundle_id_hex={}", bam_json_rpc::bundle_id_hex(&bundle_id)?);
     Ok(())
 }

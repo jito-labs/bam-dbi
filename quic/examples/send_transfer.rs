@@ -13,7 +13,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let payer_path = required("PAYER_KEYPAIR")?;
     let payer = read_keypair_file(&payer_path)
         .map_err(|error| io::Error::other(format!("read payer keypair {payer_path}: {error}")))?;
-    let recipient = required("RECIPIENT")?.parse()?;
+    let recipient = match env::var("RECIPIENT") {
+        Ok(value) if !value.is_empty() => value.parse()?,
+        _ => payer.pubkey(),
+    };
     let lamports = env::var("LAMPORTS")
         .unwrap_or_else(|_| "1".to_owned())
         .parse()?;
@@ -28,6 +31,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     )?;
     let transaction = VersionedTransaction::try_new(VersionedMessage::V0(message), &[&payer])?;
     let wire_transaction = wincode::serialize(&transaction)?;
+    let signature = transaction.signatures[0].to_string();
+
+    println!("transaction_signature={signature}");
 
     let credential_path = required("BAM_QUIC_KEYPAIR")?;
     let credential = read_keypair_file(&credential_path).map_err(|error| {
@@ -40,7 +46,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     )
     .await?;
 
-    println!("stream acknowledged; bundle acceptance and landing are unconfirmed");
+    println!("quic_stream_acknowledged=true");
     Ok(())
 }
 

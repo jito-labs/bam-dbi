@@ -23,6 +23,6 @@ async fn main() -> Result<()> {
 
     bam_quic::send_bundle(&address, &keypair, &transactions).await?;
 
-    println!("stream acknowledged; bundle acceptance and landing are unconfirmed");
+    println!("quic_stream_acknowledged=true");
     Ok(())
 }

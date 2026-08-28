@@ -1,4 +1,4 @@
-use std::{error::Error, io, time::Duration};
+use std::{error::Error, fmt::Write as _, io, time::Duration};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use reqwest::redirect::Policy;
@@ -26,6 +26,22 @@ pub fn send_bundle(
         .json()?;
 
     bundle_id(response)
+}
+
+/// Convert BAM's base64 bundle ID to the lowercase hex form used by Grafana.
+pub fn bundle_id_hex(bundle_id: &str) -> Result<String, Box<dyn Error>> {
+    let raw_bundle_id = STANDARD
+        .decode(bundle_id)
+        .map_err(|error| io::Error::other(format!("BAM bundle ID is not valid base64: {error}")))?;
+    if raw_bundle_id.len() != 32 {
+        return Err(io::Error::other("BAM bundle ID must decode to 32 bytes").into());
+    }
+
+    let mut hex_bundle_id = String::with_capacity(64);
+    for byte in raw_bundle_id {
+        write!(&mut hex_bundle_id, "{byte:02x}")?;
+    }
+    Ok(hex_bundle_id)
 }
 
 fn send_bundle_request(transactions: &[Vec<u8>]) -> Result<Value, &'static str> {
@@ -182,6 +198,19 @@ mod tests {
         .unwrap_err();
 
         assert!(error.to_string().contains("invalid params"));
+    }
+
+    #[test]
+    fn converts_bundle_id_for_grafana() {
+        let raw_bundle_id = (0u8..32).collect::<Vec<_>>();
+        let encoded_bundle_id = STANDARD.encode(&raw_bundle_id);
+
+        assert_eq!(
+            bundle_id_hex(&encoded_bundle_id).unwrap(),
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        );
+        assert!(bundle_id_hex("not-base64").is_err());
+        assert!(bundle_id_hex(&STANDARD.encode([0; 31])).is_err());
     }
 
     fn read_request(stream: &mut TcpStream) -> (String, Vec<u8>) {

@@ -1,79 +1,160 @@
-# BAM direct bundle examples
+# Jito BAM direct bundle examples
 
-Small clients for submitting bundles directly to BAM. Each transport is an
-independent Cargo workspace crate so its dependencies stay isolated. Both
-accept one to five signed wire-format transactions in bundle order.
+Rust reference clients for submitting ordered bundles directly to Jito BAM by
+JSON-RPC or QUIC. Both clients accept one to five fully signed, serialized
+Solana transactions in bundle order. The included `send_transfer` examples
+build and sign a V0 SOL transfer, so each transport can be tested end to end.
 
-## Signed transfer quickstart
+These endpoints are currently for testing. Submitting a signed transaction can
+spend real SOL through transaction fees and transfer instructions. Review the
+[Jito Terms of Use](https://www.jito.wtf/terms-of-use/) before testing.
 
-The two `send_transfer` examples fetch a fresh blockhash, build and sign an
-Agave V0 system transfer, serialize it with `wincode`, and submit it as a
-one-transaction bundle. Use a funded payer and a recipient appropriate for the
-cluster selected by `SOLANA_RPC_URL`:
+## Choose a transport
+
+| Transport | Endpoint | Authentication | Successful client output |
+| --- | --- | --- | --- |
+| JSON-RPC | `http://<region>.mainnet.bam.jito.wtf:9090/api/v1/bundles` | Jito-provided UUID in `x-jito-auth` | Bundle ID in base64 and hex |
+| QUIC | `<region>.mainnet.bam.jito.wtf:11228` | Jito-allowlisted Ed25519 keypair | QUIC stream acknowledgment |
+
+Choose an active region using the
+[BAM node explorer](https://explorer.bam.dev/api/v1/validators). The included
+environment template uses New York (`ewr`) as an example.
+
+The credentials are separate. A JSON-RPC UUID cannot authenticate a QUIC
+connection, and a QUIC keypair cannot authenticate JSON-RPC. New or changed
+access can take up to 80 seconds to propagate to every BAM node.
+
+## Prerequisites
+
+- Rust with Cargo. The examples build with stable Rust; repository formatting
+  and lint checks use nightly Rust.
+- A funded Solana fee-payer keypair for the signed-transfer examples.
+- A Jito-provided JSON-RPC UUID, an allowlisted QUIC keypair, or both.
+- A Solana RPC URL for fetching a recent blockhash.
+
+Use a dedicated keypair for QUIC authentication. It does not need SOL and
+should not be the transaction fee payer or a trading wallet. Share only its
+public key with Jito for allowlisting.
+
+## Configure the examples
+
+Copy the environment template and replace the values for the transport you
+want to test:
 
 ```bash
-export SOLANA_RPC_URL='<solana-rpc-url>'
-export PAYER_KEYPAIR='/path/to/funded-payer.json'
-export RECIPIENT='<recipient-pubkey>'
-export LAMPORTS=1
+cp .env.example .env
+${EDITOR:-vi} .env
+set -a
+source .env
+set +a
 ```
 
-## JSON-RPC
+The programs read exported environment variables; they do not load `.env`
+automatically. The local `.env` file and `*-keypair.json` files are ignored by
+Git.
 
-Set the BAM HTTP endpoint and credential, then run the complete transfer
-example:
+`PAYER_KEYPAIR` must point to a funded Solana JSON keypair. By default, the
+signed example sends one lamport back to the payer itself. Set `RECIPIENT` to
+send to a different address, and set `LAMPORTS` to change the amount.
+
+## Run the JSON-RPC example
 
 ```bash
-export BAM_BUNDLE_URL='<provided-bam-url>/api/v1/bundles'
-export JITO_AUTH_UUID='<provided-uuid>'
-
 cargo run --release -p bam-json-rpc --example send_transfer
 ```
 
-To submit transactions already prepared by another process, pass each one as a
-base64-encoded command-line argument:
+Expected output:
 
-```bash
-export SIGNED_TX_B64='<base64-signed-transaction>'
-
-cargo run --release -p bam-json-rpc -- "$SIGNED_TX_B64"
+```text
+transaction_signature=<base58-transaction-signature>
+bundle_id=<base64-bundle-id>
+bundle_id_hex=<lowercase-hex-bundle-id>
 ```
 
-A returned bundle ID means BAM accepted the bundle into its ingress queue. It
-does not guarantee the bundle will land.
+The bundle ID means BAM accepted the request into its ingress queue. It does
+not mean the transaction was selected or landed. `bundle_id_hex` is the same
+identifier in the format used by BAM's Grafana bundle lookup. Use the printed
+transaction signature with a Solana RPC endpoint or explorer to check landing.
 
-## QUIC
-
-Set the BAMB QUIC endpoint and allowlisted credential, then run the same
-transfer over QUIC. `BAM_QUIC_KEYPAIR` authenticates the connection;
-`PAYER_KEYPAIR` signs the transaction.
+## Run the QUIC example
 
 ```bash
-export BAM_QUIC_ADDR='<provided-host>:<port>'
-export BAM_QUIC_KEYPAIR='/path/to/allowlisted-keypair.json'
-
 cargo run --release -p bam-quic --example send_transfer
 ```
 
-The QUIC binary also accepts prepared base64 transactions:
+Expected output:
 
-```bash
-export SIGNED_TX_B64='<base64-signed-transaction>'
-
-cargo run --release -p bam-quic -- "$SIGNED_TX_B64"
+```text
+transaction_signature=<base58-transaction-signature>
+quic_stream_acknowledged=true
 ```
 
-A successful send means the peer acknowledged the stream bytes. QUIC returns
-no bundle ID or application response, so acceptance and landing are
-unconfirmed.
+The acknowledgment means the authenticated QUIC connection was established,
+one BAMB v0 frame was written to a unidirectional stream, and the peer did not
+stop that stream with an error. QUIC does not return a bundle ID or landing
+result. Use the printed transaction signature to check landing separately.
 
-The tests cover legacy, V0, and BAM V1 transactions, request limits, JSON-RPC
-authentication and response handling, and an authenticated QUIC handshake with
-one BAMB frame per stream:
+## Submit an existing signed bundle
+
+Each lower-level client accepts one to five base64-encoded, fully signed
+transactions as command-line arguments. Arguments are submitted in bundle
+order.
+
+JSON-RPC:
 
 ```bash
+export SIGNED_TX_1_B64='<base64-signed-transaction>'
+cargo run --release -p bam-json-rpc -- "$SIGNED_TX_1_B64"
+```
+
+QUIC:
+
+```bash
+export SIGNED_TX_1_B64='<base64-signed-transaction>'
+cargo run --release -p bam-quic -- "$SIGNED_TX_1_B64"
+```
+
+Add up to four more quoted transaction arguments to either command for a
+multi-transaction bundle. These lower-level clients do not deserialize the
+transactions, so they print the transport result but not transaction
+signatures.
+
+## Supported behavior and limits
+
+- Bundles contain one to five ordered transactions and execute atomically.
+- JSON-RPC uses HTTP, the `sendBundle` method, base64 transaction encoding, and
+  the `/api/v1/bundles` path. HTTPS and base58 encoding are not supported.
+- QUIC uses UDP, ALPN `solana-tpu`, and one BAMB v0 frame per unidirectional
+  stream.
+- The client envelope permits transactions through 4,096 bytes. Keep current
+  mainnet transactions within the standard 1,232-byte packet size unless Jito
+  explicitly enables a larger transaction format.
+- Legacy and versioned transaction support depends on the target cluster. The
+  signed-transfer examples use V0.
+- Bundle expiry, partial execution, and a bundle-status method are not
+  supported. QUIC does not return a bundle ID.
+- The initial limit is 25 bundle submissions per second, per credential, per
+  BAM node. Start functional testing at one bundle per second.
+
+For production senders, reuse HTTP and QUIC connections rather than creating a
+new connection per bundle, and submit to all active BAM regions. The reference
+programs are intentionally one-shot examples.
+
+## Test the repository
+
+```bash
+cargo +nightly fmt --all -- --check
+cargo +nightly clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --all-targets --locked
 ```
 
-These are one-shot examples. Production senders should reuse their HTTP or
-QUIC connection and open one QUIC unidirectional stream per bundle.
+The tests cover JSON-RPC authentication and response handling, bundle-ID hex
+conversion, BAMB v0 framing, QUIC client authentication, request limits, and
+legacy, V0, and V1 serialized transaction fixtures.
+
+## Source layout
+
+- `json-rpc/src/lib.rs`: JSON-RPC `sendBundle` client.
+- `json-rpc/examples/send_transfer.rs`: signed V0 transfer over JSON-RPC.
+- `quic/src/lib.rs`: authenticated QUIC client and BAMB v0 framing.
+- `quic/examples/send_transfer.rs`: signed V0 transfer over QUIC.
