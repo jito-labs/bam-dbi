@@ -73,8 +73,8 @@ bundle_id_hex=<lowercase-hex-bundle-id>
 
 The bundle ID means BAM accepted the request into its ingress queue. It does
 not mean the transaction was selected or landed. `bundle_id_hex` is the same
-identifier in the format used by BAM's Grafana bundle lookup. Use the printed
-transaction signature with a Solana RPC endpoint or explorer to check landing.
+identifier encoded as lowercase hex. Use the printed transaction signature
+with a Solana RPC endpoint or explorer to check landing.
 
 ## Run the QUIC example
 

@@ -28,7 +28,6 @@ pub fn send_bundle(
     bundle_id(response)
 }
 
-/// Convert BAM's base64 bundle ID to the lowercase hex form used by Grafana.
 pub fn bundle_id_hex(bundle_id: &str) -> Result<String, Box<dyn Error>> {
     let raw_bundle_id = STANDARD
         .decode(bundle_id)
@@ -201,7 +200,7 @@ mod tests {
     }
 
     #[test]
-    fn converts_bundle_id_for_grafana() {
+    fn converts_bundle_id_to_hex() {
         let raw_bundle_id = (0u8..32).collect::<Vec<_>>();
         let encoded_bundle_id = STANDARD.encode(&raw_bundle_id);
 
