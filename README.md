@@ -6,8 +6,7 @@ Solana transactions in bundle order. The included `send_transfer` examples
 build and sign a V0 SOL transfer, so each transport can be tested end to end.
 
 These endpoints are currently for testing. Submitting a signed transaction can
-spend real SOL through transaction fees and transfer instructions. Review the
-[Jito Terms of Use](https://www.jito.wtf/terms-of-use/) before testing.
+spend real SOL through transaction fees and transfer instructions.
 
 ## Choose a transport
 
@@ -118,39 +117,6 @@ Add up to four more quoted transaction arguments to either command for a
 multi-transaction bundle. These lower-level clients do not deserialize the
 transactions, so they print the transport result but not transaction
 signatures.
-
-## Supported behavior and limits
-
-- Bundles contain one to five ordered transactions and execute atomically.
-- JSON-RPC uses HTTP, the `sendBundle` method, base64 transaction encoding, and
-  the `/api/v1/bundles` path. HTTPS and base58 encoding are not supported.
-- QUIC uses UDP, ALPN `solana-tpu`, and one BAMB v0 frame per unidirectional
-  stream.
-- The client envelope permits transactions through 4,096 bytes. Keep current
-  mainnet transactions within the standard 1,232-byte packet size unless Jito
-  explicitly enables a larger transaction format.
-- Legacy and versioned transaction support depends on the target cluster. The
-  signed-transfer examples use V0.
-- Bundle expiry, partial execution, and a bundle-status method are not
-  supported. QUIC does not return a bundle ID.
-- The initial limit is 25 bundle submissions per second, per credential, per
-  BAM node. Start functional testing at one bundle per second.
-
-For production senders, reuse HTTP and QUIC connections rather than creating a
-new connection per bundle, and submit to all active BAM regions. The reference
-programs are intentionally one-shot examples.
-
-## Test the repository
-
-```bash
-cargo +nightly fmt --all -- --check
-cargo +nightly clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --all-targets --locked
-```
-
-The tests cover JSON-RPC authentication and response handling, bundle-ID hex
-conversion, BAMB v0 framing, QUIC client authentication, request limits, and
-legacy, V0, and V1 serialized transaction fixtures.
 
 ## Source layout
 
